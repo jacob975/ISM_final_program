@@ -24,30 +24,7 @@ import numpy as np
 from scipy import optimize
 from scipy.stats import chisquare
 from sys import argv
-
-# Constants in cgs unit
-k = 1.381e-16
-h = 6.626e-27
-c = 2.998e10
-m_H = 1.674e-24
-mu = 2.8
-pixel_size = 0.0035/3600 # degree
-pc = 3.08567758e18
-
-#-------------------------------------------------
-# Planck function
-#
-#               2hc^2               1
-#  B_l(l, T) = ------- ----------------------------
-#                l^5    e^(hc/(l * k_B * T)) - 1
-#
-
-def planck(wavelength_mu, T, A):
-    wav  = wavelength_mu*1e-4
-    a = 2.0*h*c**2
-    b = np.array(np.divide(h*c, (wav*k*T)), dtype = float)
-    intensity = np.divide(a, wav**5 * (np.exp(b) - 1.0) )
-    return np.array(A * intensity, dtype = float)
+import phys_const
 
 # Find the best template of this observation data.
 def match_process(source, templates):
@@ -99,32 +76,27 @@ if __name__ == "__main__":
     # Load data in J, H, K bands.
     sed_data = np.loadtxt(sed_table_name)
     JHK_sed_data = sed_data[:,:3]
-    # fitting planck func with near-infrared data and given temprature.
-    band = [ [ 'J',   1.248], 
-             [ 'H',   1.631],
-             [ 'Ks',  2.201], 
-             [ 'IR1', 3.6  ], 
-             [ 'IR2', 4.5  ], 
-             [ 'IR3', 5.8  ], 
-             [ 'IR4', 8.0  ], 
-             [ 'MP1', 24.0 ]]
-    band_array = np.array(band, dtype = object)
+    # fitting template with near-infrared data and given temprature.
+    band_array = phys_const.band_array 
     star_template = np.loadtxt("/mazu/users/Jacob975/ISM/20181227final/ISM_final_program/star_koornneef.dat", dtype = str)
     stage = star_template[:,0]
     Spectral_type = star_template[:,1]
     SED_template = np.array(star_template[:,2:], dtype = float)
-    match_index = np.zeros(len(sed_data))
+    match_index = np.zeros(len(sed_data), dtype=int)
     match_ratio = np.zeros(len(sed_data))
+    match_chi = np.zeros(len(sed_data))
     num_data = len(JHK_sed_data)
     for i, source in enumerate(JHK_sed_data):
         # Fit the sed data to find the temperature.
         chi, p, template_index, ratio = match_process(source, SED_template)
         match_index[i] = template_index
         match_ratio[i] = ratio
+        match_template = ratio * SED_template[template_index, :3]
+        match_chi[i] = chi
         '''
         # Show the plots  
         plt.plot(band_array[:3,1], source, label = 'observation data', c = 'b')
-        plt.scatter(band_array[:3,1], source, c = 'b')
+        plt.errorbar(band_array[:3,1], source, yerr = sed_data[i, 8:11], c = 'b')
         plt.plot(band_array[:3,1], match_template, label = 'fitted template', c = 'r')
         plt.scatter(band_array[:3,1], match_template, c = 'r')
         plt.xlabel('wavelength $\lambda(\mu)$')
@@ -137,9 +109,10 @@ if __name__ == "__main__":
             print ("Progress: {0}/{1}".format(i+1, num_data))
     # Save the result
     match_spectral = Spectral_type[match_index]
-    np.savetxt('match_spectral.txt', match_spectral)
-    np.savetxt('match_index.txt', match_index)
+    np.savetxt('match_spectral.txt', match_spectral, fmt = '%s')
+    np.savetxt('match_index.txt', match_index, fmt = '%d')
     np.savetxt('match_ratio.txt', match_ratio)
+    np.savetxt('match_chi.txt', match_chi)
     #-----------------------------------
     # Measure time
     elapsed_time = time.time() - start_time
