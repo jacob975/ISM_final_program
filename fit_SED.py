@@ -32,6 +32,7 @@ def match_process(source, templates):
     ref_chi = 999.0
     ref_p = 0.0
     index = 0
+    ref_ratio = 0
     match_template = None
     # Take each row, calculate the chi-square value.
     for i in range(len(templates)):
